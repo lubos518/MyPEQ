@@ -1,0 +1,93 @@
+//  LocalLink.h
+//  拡張 → プレイヤーアプリ へ PCM を運ぶローカル接続。
+//
+//  なぜこの形か（いずれも実機のサンドボックスログで確定）:
+//    - App Group のファイル: deny file-write-data
+//    - POSIX 共有メモリ:     deny ipc-posix-shm-read-data / ipc-posix-shm-write-create
+//    - 待ち受け:             deny network-bind local:*:0
+//  つまり拡張は「作る・待つ」が全部禁じられている。
+//  一方、外へ繋ぐのは Media Device Extension の本来の用途（ネットワーク機器へ音を送る）
+//  なので許されているはず。そこで待ち受けはプレイヤー側が持ち、拡張は繋ぎに行く。
+//
+//  形式: float32 インターリーブ 2ch 48kHz を、チャンクごとに 12 バイトのヘッダ
+//  （マジック 8 + サンプル数 4）を付けて TCP で流す。中身はリトルエンディアンのまま。
+//  ヘッダ無しの生 float を流していたが、TCP は 4 バイト境界では切れないので、
+//  recv/send が返した端数バイトを捨てるか送り直すと以後の float が 2 サンプルに
+//  またがって組み直され、NaN や 1e38 になる。しかも誰も気付けない。
+//  端数はバイト単位で持ち越し、ヘッダで毎チャンク検算する。送受とも ETLinkCodec.{h,c} の実装。
+
+#import <Foundation/Foundation.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+#define ET_LINK_PORT 47101
+#define ET_LINK_HOST "127.0.0.1"
+
+/// 送り手（拡張側）。接続は自動で張り直す。
+@interface ETLinkSender : NSObject
+@property (class, readonly) ETLinkSender *shared;
+@property (nonatomic, readonly) BOOL connected;
+@property (nonatomic, readonly) uint64_t sentFrames;
+/// 送り手が起きた回数と、send を撃った回数。start のたびに 0 から数える。
+/// 周期で回していた頃の 500 回/秒が、音を積んだ回数まで減ったかを実機で確かめるための数
+/// （どちらも _q が書き、読むほうは競合を承知の概算）。
+@property (nonatomic, readonly) uint64_t pumpCount;
+@property (nonatomic, readonly) uint64_t sendCalls;
+- (void)start;
+- (void)stop;
+/// ObjC のメソッドから呼ぶ版。中身は下の ETLinkSenderPushInterleaved。
+/// リアルタイムスレッドからは C 関数のほうを呼ぶこと（こちらは objc_msgSend を通る）。
+- (void)pushInterleaved:(const float *)samples frames:(uint32_t)frames channels:(uint32_t)channels;
+@end
+
+/// 音のスレッドから呼ぶ。内部のリングに積み、送り手が寝ていれば 1 回だけ起こす。
+/// objc_msgSend も ARC も libdispatch も通らない（起こすのは semaphore_signal 1 回）。
+/// 送信は別スレッド（送り手の _q）。
+void ETLinkSenderPushInterleaved(const float *samples, uint32_t frames, uint32_t channels);
+
+/// 受け手（プレイヤー側）。
+@interface ETLinkReceiver : NSObject
+@property (class, readonly) ETLinkReceiver *shared;
+@property (nonatomic, readonly) BOOL listening;
+@property (nonatomic, readonly) BOOL hasPeer;
+@property (nonatomic, readonly) uint64_t receivedFrames;
+/// Current receiver sample rate (44100.0 or 48000.0 Hz). Defaults to 48000.0.
+@property (nonatomic) double sampleRate;
+/// まだ読み出していないフレーム数。そのまま遅延になる。
+@property (nonatomic, readonly) uint32_t bufferedFrames;
+/// 相手の fd が読める（または切れた）という通知で動いた回数と、recv を撃った回数。
+/// 周期で回していた頃の 1000 回/秒が、届いた回数まで減ったかを実機で確かめるための数。
+/// start のたびに 0 から数える（_q が書き、読むほうは競合を承知の概算）。
+@property (nonatomic, readonly) uint64_t readEvents;
+@property (nonatomic, readonly) uint64_t recvCalls;
+
+/// 再同期のときに置く、書き位置からの遅れ（フレーム）。
+/// 遅れの表示にはこちらを使う。bufferedFrames はその瞬間の溜まりで、
+/// 払うたびに動く。
+///
+/// **経路の遅れの大半がここ。**1024 で始め、枯れたら黙って 2048 へ逃げる。
+/// 選ばせるものではないので設定には出さない。繋ぎ直すと 1024 に戻る。
+@property (class, nonatomic, readonly) uint32_t targetFrames;
+
+/// 溜まりが尽きて無音を書いた回数と、そのフレーム数。
+/// **耳では数えられない。**数百ミリ秒に 1 度の枯れは聞き取れない。
+@property (class, nonatomic, readonly) uint32_t starveCount;
+@property (class, nonatomic, readonly) uint64_t starveFrames;
+
+/// 溜まりすぎて捨てた回数と、そのフレーム数。
+/// 送り手と読み手のクロックはぴたりとは合わないので、放っておくと
+/// 溜まりが漂う。狙いの 2 倍を越えたら置き直す。
+@property (class, nonatomic, readonly) uint32_t trimCount;
+@property (class, nonatomic, readonly) uint64_t trimFrames;
+
+/// 繋ぎ直したときに浅い側から始め直す。数えたものも 0 に戻す。
++ (void)resetLinkState;
+- (BOOL)start;
+- (void)stop;
+/// 受信済みのサンプルを取り出す。足りない分は無音で埋める。
+- (uint32_t)readInterleaved:(float *)out frames:(uint32_t)frames;
+/// Directly push interleaved Float32 PCM frames into the receiver ring buffer.
+- (void)pushInterleaved:(const float *)samples frames:(uint32_t)frames channels:(uint32_t)channels;
+@end
+
+NS_ASSUME_NONNULL_END

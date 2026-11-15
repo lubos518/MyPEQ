@@ -1,0 +1,88 @@
+name: Build Unsigned IPA (Sideloadly)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    name: Build Unsigned MyPEQ IPA
+    runs-on: xcode-27
+    env:
+      XCODE_APP: /Applications/Xcode_27.0.app
+      XCODEGEN_VERSION: 2.46.0
+      XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 27 and Verify iOS 27 SDK
+        run: |
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "::error::$XCODE_APP not found on runner"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          swift --version
+          sdk=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iphoneos SDK: $sdk"
+          case "$sdk" in
+            27.*) ;;
+            *) echo "::error::Expected iOS 27 SDK (got ${sdk})"; exit 1 ;;
+          esac
+
+      - name: Install XcodeGen ${{ env.XCODEGEN_VERSION }}
+        run: |
+          dir="$HOME/.ci-tools/xcodegen"
+          zip="$RUNNER_TEMP/xcodegen.zip"
+          curl -fsSL --retry 3 -o "$zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/$XCODEGEN_VERSION/xcodegen.zip"
+          echo "$XCODEGEN_SHA256  $zip" | shasum -a 256 -c -
+          rm -rf "$dir"
+          mkdir -p "$HOME/.ci-tools"
+          unzip -q "$zip" -d "$HOME/.ci-tools"
+          "$dir/bin/xcodegen" --version
+          echo "XCODEGEN=$dir/bin/xcodegen" >> "$GITHUB_ENV"
+
+      - name: Generate Xcode Project
+        run: "$XCODEGEN" generate --spec project.yml
+
+      - name: Archive Unsigned Release Build
+        run: |
+          xcodebuild archive \
+            -project MyPEQ.xcodeproj \
+            -scheme MyPEQ \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/MyPEQ.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Verify Embedded Extension and Package Sideloadly IPA
+        run: |
+          APP_PATH="build/MyPEQ.xcarchive/Products/Applications/MyPEQ.app"
+          if [ ! -d "$APP_PATH/Extensions/MyPEQExtension.appex" ] && [ ! -d "$APP_PATH/PlugIns/MyPEQExtension.appex" ]; then
+            echo "::error::MyPEQExtension.appex was not embedded inside $APP_PATH"
+            find "$APP_PATH" -maxdepth 3
+            exit 1
+          fi
+          mkdir -p build/ipa/Payload
+          cp -R "$APP_PATH" "build/ipa/Payload/MyPEQ.app"
+          (
+            cd build/ipa
+            zip -r -y "../../MyPEQ-Sideloadly.ipa" Payload
+          )
+          ls -lh MyPEQ-Sideloadly.ipa
+
+      - name: Upload MyPEQ-Sideloadly.ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyPEQ-Sideloadly
+          path: MyPEQ-Sideloadly.ipa
+          if-no-files-found: error

@@ -1,0 +1,12 @@
+*.dSYM/
+*.ipa
+*.log
+*.xcodeproj/
+*.xcworkspace/
+.DS_Store
+DerivedData/
+build/
+out/
+xcuserdata/
+.build/
+__pycache__/
