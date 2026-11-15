@@ -50,7 +50,8 @@ jobs:
           echo "XCODEGEN=$dir/bin/xcodegen" >> "$GITHUB_ENV"
 
       - name: Generate Xcode Project
-        run: "$XCODEGEN" generate --spec project.yml
+        run: |
+          "$XCODEGEN" generate --spec project.yml
 
       - name: Archive Unsigned Release Build
         run: |
