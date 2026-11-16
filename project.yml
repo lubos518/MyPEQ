@@ -33,6 +33,7 @@ targets:
         PRODUCT_NAME: MyPEQ
         PRODUCT_BUNDLE_IDENTIFIER: com.mypeq.app
         INFOPLIST_FILE: Sources/MyPEQ/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Sources/MyPEQ/MyPEQ.entitlements
         SWIFT_OBJC_BRIDGING_HEADER: Sources/MyPEQ/MyPEQ-Bridging-Header.h
         HEADER_SEARCH_PATHS:

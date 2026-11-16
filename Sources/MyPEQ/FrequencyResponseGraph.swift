@@ -7,6 +7,7 @@ public struct FrequencyResponseGraph: View {
     public let profile: EQProfile?
     public let sampleRate: Double
     public let isMasterEnabled: Bool
+    public let stackedProfileCount: Int
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -17,10 +18,16 @@ public struct FrequencyResponseGraph: View {
     private let gridFrequencies: [Double] = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
     private let gridDecibels: [Double] = [12, 6, 0, -6, -12]
 
-    public init(profile: EQProfile?, sampleRate: Double, isMasterEnabled: Bool) {
+    public init(
+        profile: EQProfile?,
+        sampleRate: Double,
+        isMasterEnabled: Bool,
+        stackedProfileCount: Int = 1
+    ) {
         self.profile = profile
         self.sampleRate = sampleRate
         self.isMasterEnabled = isMasterEnabled
+        self.stackedProfileCount = stackedProfileCount
     }
 
     public var body: some View {
@@ -54,28 +61,44 @@ public struct FrequencyResponseGraph: View {
             Label("Frequency Response", systemImage: "chart.xyaxis.line")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
+                .lineLimit(1)
 
-            Spacer()
+            Spacer(minLength: 4)
 
             if let profile {
                 if isMasterEnabled {
-                    Text(String(format: "Preamp %+.1f dB", profile.preampDB))
-                        .font(.caption.weight(.medium))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(.ultraThinMaterial))
+                    HStack(spacing: 6) {
+                        if stackedProfileCount > 1 {
+                            Text("\(stackedProfileCount) Stacked")
+                                .font(.caption2.weight(.semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                        }
+
+                        Text(String(format: "Preamp %+.1f dB", profile.preampDB))
+                            .font(.caption.weight(.medium))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(.ultraThinMaterial))
+                    }
+                    .lineLimit(1)
                 } else {
                     Label("Bypassed (0.0 dB)", systemImage: "pause.circle")
                         .font(.caption.weight(.medium))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             } else {
                 Text("Flat Reference")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
     }

@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="100%" height="100%">
+                    
+                <defs>
+                    <!-- Apple iOS Continuous Squircle Clip -->
+                    <clipPath id="iosSquircle">
+                        <rect width="1024" height="1024" rx="228" ry="228" />
+                    </clipPath>
+
+                    <!-- Background Radial Gradient -->
+                    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#0a0a0c" />
+                        <stop offset="55%" stop-color="#0a0a0c" />
+                        <stop offset="100%" stop-color="#03050A" />
+                    </linearGradient>
+
+                    <!-- Ambient Glow around Peak -->
+                    <radialGradient id="ambientGlow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55" />
+                        <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.18" />
+                        <stop offset="100%" stop-color="#0a0a0c" stop-opacity="0" />
+                    </radialGradient>
+
+                    <!-- Main Parametric Curve Horizontal Gradient -->
+                    <linearGradient id="curveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#38bdf8" />
+                        <stop offset="45%" stop-color="#ffffff" />
+                        <stop offset="100%" stop-color="#38bdf8" />
+                    </linearGradient>
+
+                    <!-- Secondary Curve Gradient -->
+                    <linearGradient id="secGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.1" />
+                        <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.9" />
+                        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.1" />
+                    </linearGradient>
+
+                    <!-- Area Fill under EQ Curve -->
+                    <linearGradient id="areaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.42" />
+                        <stop offset="55%" stop-color="#38bdf8" stop-opacity="0.10" />
+                        <stop offset="100%" stop-color="#0a0a0c" stop-opacity="0.0" />
+                    </linearGradient>
+
+                    <!-- Spectrum Bar Vertical Gradient -->
+                    <linearGradient id="barGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#ffffff" />
+                        <stop offset="100%" stop-color="#38bdf8" stop-opacity="0" />
+                    </linearGradient>
+
+                    <!-- Glass Rim Highlight -->
+                    <linearGradient id="rimLight" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.45" />
+                        <stop offset="35%" stop-color="#ffffff" stop-opacity="0.2" />
+                        <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.05" />
+                    </linearGradient>
+
+                    <!-- Glow Filters -->
+                    <filter id="glowStrong" x="-25%" y="-25%" width="150%" height="150%">
+                        <feGaussianBlur stdDeviation="22" result="blur" />
+                    </filter>
+                    <filter id="glowSubtle" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="6" result="blur" />
+                        <feMerge>
+                            <feMergeNode in="blur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+                </defs>
+            
+                    
+                <g clip-path="url(#iosSquircle)">
+                    <!-- Deep Studio Background -->
+                    <rect width="1024" height="1024" fill="url(#bgGrad)" />
+                    
+                    <!-- Ambient Top Spotlight -->
+                    <circle cx="408.0" cy="389.0" r="480" fill="url(#ambientGlow)" opacity="0.45" />
+                    
+                    <!-- Acoustic Grid -->
+                    
+                <line x1="96" y1="575" x2="928" y2="575" stroke="#ffffff" stroke-width="2" opacity="0.22"/>
+            
+
+                    <!-- Spectrum Analyzer Bars -->
+                    
+
+                    <!-- Secondary Harmonic Curve -->
+                    
+
+                    <!-- Glowing Area Fill under Parametric Curve -->
+                    <path d="M 96.0 575.0 L 107.6 567.3 L 119.1 562.8 L 130.7 558.0 L 142.2 552.9 L 153.8 547.2 L 165.3 540.9 L 176.9 534.1 L 188.4 526.6 L 200.0 518.6 L 211.6 510.0 L 223.1 501.0 L 234.7 491.5 L 246.2 481.7 L 257.8 471.7 L 269.3 461.6 L 280.9 451.5 L 292.4 441.6 L 304.0 432.1 L 315.6 423.1 L 327.1 414.7 L 338.7 407.3 L 350.2 400.8 L 361.8 395.6 L 373.3 391.7 L 384.9 389.3 L 396.4 388.3 L 408.0 389.0 L 419.6 391.4 L 431.1 395.3 L 442.7 400.7 L 454.2 407.7 L 465.8 415.9 L 477.3 425.4 L 488.9 435.8 L 500.4 447.1 L 512.0 458.9 L 523.6 471.2 L 535.1 483.8 L 546.7 496.4 L 558.2 508.8 L 569.8 521.0 L 581.3 532.9 L 592.9 544.2 L 604.4 554.9 L 616.0 565.0 L 627.6 574.5 L 639.1 583.1 L 650.7 591.0 L 662.2 598.1 L 673.8 604.4 L 685.3 609.9 L 696.9 614.6 L 708.4 618.4 L 720.0 621.4 L 731.6 623.6 L 743.1 625.0 L 754.7 625.6 L 766.2 625.5 L 777.8 624.7 L 789.3 623.2 L 800.9 621.1 L 812.4 618.5 L 824.0 615.5 L 835.6 612.1 L 847.1 608.5 L 858.7 604.6 L 870.2 600.7 L 881.8 596.6 L 893.3 592.5 L 904.9 588.4 L 916.4 583.9 L 928.0 575.0 L 928 920 L 96 920 Z" fill="url(#areaGrad)" />
+
+                    <!-- Outer Neon Blur Layer of Main Curve -->
+                    <path d="M 96.0 575.0 L 107.6 567.3 L 119.1 562.8 L 130.7 558.0 L 142.2 552.9 L 153.8 547.2 L 165.3 540.9 L 176.9 534.1 L 188.4 526.6 L 200.0 518.6 L 211.6 510.0 L 223.1 501.0 L 234.7 491.5 L 246.2 481.7 L 257.8 471.7 L 269.3 461.6 L 280.9 451.5 L 292.4 441.6 L 304.0 432.1 L 315.6 423.1 L 327.1 414.7 L 338.7 407.3 L 350.2 400.8 L 361.8 395.6 L 373.3 391.7 L 384.9 389.3 L 396.4 388.3 L 408.0 389.0 L 419.6 391.4 L 431.1 395.3 L 442.7 400.7 L 454.2 407.7 L 465.8 415.9 L 477.3 425.4 L 488.9 435.8 L 500.4 447.1 L 512.0 458.9 L 523.6 471.2 L 535.1 483.8 L 546.7 496.4 L 558.2 508.8 L 569.8 521.0 L 581.3 532.9 L 592.9 544.2 L 604.4 554.9 L 616.0 565.0 L 627.6 574.5 L 639.1 583.1 L 650.7 591.0 L 662.2 598.1 L 673.8 604.4 L 685.3 609.9 L 696.9 614.6 L 708.4 618.4 L 720.0 621.4 L 731.6 623.6 L 743.1 625.0 L 754.7 625.6 L 766.2 625.5 L 777.8 624.7 L 789.3 623.2 L 800.9 621.1 L 812.4 618.5 L 824.0 615.5 L 835.6 612.1 L 847.1 608.5 L 858.7 604.6 L 870.2 600.7 L 881.8 596.6 L 893.3 592.5 L 904.9 588.4 L 916.4 583.9 L 928.0 575.0" fill="none" stroke="url(#curveGrad)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" filter="url(#glowStrong)" />
+
+                    <!-- Crisp Main Parametric EQ Curve -->
+                    <path d="M 96.0 575.0 L 107.6 567.3 L 119.1 562.8 L 130.7 558.0 L 142.2 552.9 L 153.8 547.2 L 165.3 540.9 L 176.9 534.1 L 188.4 526.6 L 200.0 518.6 L 211.6 510.0 L 223.1 501.0 L 234.7 491.5 L 246.2 481.7 L 257.8 471.7 L 269.3 461.6 L 280.9 451.5 L 292.4 441.6 L 304.0 432.1 L 315.6 423.1 L 327.1 414.7 L 338.7 407.3 L 350.2 400.8 L 361.8 395.6 L 373.3 391.7 L 384.9 389.3 L 396.4 388.3 L 408.0 389.0 L 419.6 391.4 L 431.1 395.3 L 442.7 400.7 L 454.2 407.7 L 465.8 415.9 L 477.3 425.4 L 488.9 435.8 L 500.4 447.1 L 512.0 458.9 L 523.6 471.2 L 535.1 483.8 L 546.7 496.4 L 558.2 508.8 L 569.8 521.0 L 581.3 532.9 L 592.9 544.2 L 604.4 554.9 L 616.0 565.0 L 627.6 574.5 L 639.1 583.1 L 650.7 591.0 L 662.2 598.1 L 673.8 604.4 L 685.3 609.9 L 696.9 614.6 L 708.4 618.4 L 720.0 621.4 L 731.6 623.6 L 743.1 625.0 L 754.7 625.6 L 766.2 625.5 L 777.8 624.7 L 789.3 623.2 L 800.9 621.1 L 812.4 618.5 L 824.0 615.5 L 835.6 612.1 L 847.1 608.5 L 858.7 604.6 L 870.2 600.7 L 881.8 596.6 L 893.3 592.5 L 904.9 588.4 L 916.4 583.9 L 928.0 575.0" fill="none" stroke="url(#curveGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+                    
+                    <!-- White Hot Core Line -->
+                    <path d="M 96.0 575.0 L 107.6 567.3 L 119.1 562.8 L 130.7 558.0 L 142.2 552.9 L 153.8 547.2 L 165.3 540.9 L 176.9 534.1 L 188.4 526.6 L 200.0 518.6 L 211.6 510.0 L 223.1 501.0 L 234.7 491.5 L 246.2 481.7 L 257.8 471.7 L 269.3 461.6 L 280.9 451.5 L 292.4 441.6 L 304.0 432.1 L 315.6 423.1 L 327.1 414.7 L 338.7 407.3 L 350.2 400.8 L 361.8 395.6 L 373.3 391.7 L 384.9 389.3 L 396.4 388.3 L 408.0 389.0 L 419.6 391.4 L 431.1 395.3 L 442.7 400.7 L 454.2 407.7 L 465.8 415.9 L 477.3 425.4 L 488.9 435.8 L 500.4 447.1 L 512.0 458.9 L 523.6 471.2 L 535.1 483.8 L 546.7 496.4 L 558.2 508.8 L 569.8 521.0 L 581.3 532.9 L 592.9 544.2 L 604.4 554.9 L 616.0 565.0 L 627.6 574.5 L 639.1 583.1 L 650.7 591.0 L 662.2 598.1 L 673.8 604.4 L 685.3 609.9 L 696.9 614.6 L 708.4 618.4 L 720.0 621.4 L 731.6 623.6 L 743.1 625.0 L 754.7 625.6 L 766.2 625.5 L 777.8 624.7 L 789.3 623.2 L 800.9 621.1 L 812.4 618.5 L 824.0 615.5 L 835.6 612.1 L 847.1 608.5 L 858.7 604.6 L 870.2 600.7 L 881.8 596.6 L 893.3 592.5 L 904.9 588.4 L 916.4 583.9 L 928.0 575.0" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.65" />
+
+                    <!-- Control Handles (Nodes) -->
+                    
+                <!-- Vertical Stem from 0dB to Main Peak -->
+                <line x1="408.0" y1="575" x2="408.0" y2="389.0" stroke="#ffffff" stroke-width="4" stroke-dasharray="8 8" opacity="0.65"/>
+                
+                <!-- Low Node -->
+                <g transform="translate(257.8, 471.7)">
+                    <circle r="22" fill="#0a0a0c" stroke="#38bdf8" stroke-width="8" />
+                    <circle r="8" fill="#FFFFFF" />
+                </g>
+
+                <!-- High Node -->
+                <g transform="translate(777.8, 624.7)">
+                    <circle r="22" fill="#0a0a0c" stroke="#38bdf8" stroke-width="8" />
+                    <circle r="8" fill="#FFFFFF" />
+                </g>
+
+                <!-- Main Parametric Peak Node (Hero Handle) -->
+                <g transform="translate(408.0, 389.0)">
+                    <circle r="48" fill="#ffffff" opacity="0.22" filter="url(#glowStrong)" />
+                    <circle r="30" fill="#0a0a0c" stroke="#ffffff" stroke-width="11" filter="url(#glowSubtle)" />
+                    <circle r="12" fill="#FFFFFF" />
+                </g>
+            
+
+                    <!-- MyPEQ Brand Typography Badge -->
+                    
+
+                    <!-- Sleek Inner Glass Bezel Rim -->
+                    <rect x="4" y="4" width="1016" height="1016" rx="228" fill="none" stroke="url(#rimLight)" stroke-width="8" opacity="0.55" />
+                </g>
+            
+                </svg>

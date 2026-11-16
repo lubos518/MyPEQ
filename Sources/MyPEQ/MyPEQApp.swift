@@ -16,7 +16,7 @@ public struct MyPEQApp: App {
         WindowGroup {
             ContentView()
                 .onAppear {
-                    audioEngine.apply(profile: profileStore.activeProfile)
+                    audioEngine.apply(profile: profileStore.combinedActiveProfile)
                     audioEngine.start()
                 }
                 .onOpenURL { url in
@@ -28,7 +28,7 @@ public struct MyPEQApp: App {
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {
-                        audioEngine.apply(profile: profileStore.activeProfile)
+                        audioEngine.apply(profile: profileStore.combinedActiveProfile)
                         audioEngine.start()
                     }
                 }

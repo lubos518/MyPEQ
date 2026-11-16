@@ -1,5 +1,5 @@
 //  ProfileStore.swift
-//  Persistent storage and management of EqualizerAPO profile slots in the Documents directory.
+//  Persistent multi-profile storage, stack merging, and filter editing in Documents.
 
 import Combine
 import Foundation
@@ -10,17 +10,54 @@ public final class ProfileStore: ObservableObject {
     public static let shared = ProfileStore()
 
     @Published public private(set) var profiles: [EQProfile] = []
-    @Published public private(set) var activeProfileID: UUID?
+    @Published public private(set) var activeProfileIDs: Set<UUID> = []
+    @Published public private(set) var selectedProfileID: UUID?
     @Published public var lastErrorMessage: String?
 
+    /// The profile currently inspected in the Preamp & Filter Editor cards.
+    public var selectedProfile: EQProfile? {
+        if let selectedProfileID,
+           let match = profiles.first(where: { $0.id == selectedProfileID }) {
+            return match
+        }
+        return profiles.first
+    }
+
+    /// All profiles enabled in the active processing stack, preserving card order.
+    public var activeProfiles: [EQProfile] {
+        profiles.filter { activeProfileIDs.contains($0.id) }
+    }
+
+    /// Combined EqualizerAPO curve & Preamp sent to PEQAudioEngine and the Frequency Response graph.
+    public var combinedActiveProfile: EQProfile? {
+        let active = activeProfiles
+        guard !active.isEmpty else { return nil }
+        if active.count == 1, let single = active.first {
+            return single
+        }
+
+        let summedPreamp = active.reduce(Float(0)) { $0 + $1.preampDB }
+        let mergedBands = active.flatMap { $0.bands.filter(\.isEnabled) }
+        let mergedName = active.map(\.name).joined(separator: " + ")
+
+        return EQProfile(
+            id: active[0].id,
+            name: mergedName,
+            preampDB: EQProfile.clampPreamp(summedPreamp),
+            bands: mergedBands,
+            importedAt: active[0].importedAt
+        )
+    }
+
     public var activeProfile: EQProfile? {
-        guard let activeProfileID else { return nil }
-        return profiles.first { $0.id == activeProfileID }
+        combinedActiveProfile
     }
 
     private struct PersistedStore: Codable {
         var profiles: [EQProfile]
         var activeProfileID: UUID?
+        var activeProfileIDs: [UUID]?
+        var selectedProfileID: UUID?
     }
 
     private let logger = Logger(subsystem: "com.mypeq.app", category: "profile-store")
@@ -31,6 +68,10 @@ public final class ProfileStore: ObservableObject {
             ?? FileManager.default.temporaryDirectory
         self.fileURL = docsDir.appendingPathComponent("MyPEQProfiles.json", isDirectory: false)
         load()
+    }
+
+    public func isProfileActive(_ id: UUID) -> Bool {
+        activeProfileIDs.contains(id)
     }
 
     @discardableResult
@@ -45,13 +86,13 @@ public final class ProfileStore: ObservableObject {
         let data = try Data(contentsOf: url)
         let rawName = url.deletingPathExtension().lastPathComponent
         let profile = try APOParser.parse(data: data, profileName: rawName)
-        return appendAndActivate(profile)
+        return insertProfile(profile, soloActivate: true)
     }
 
     @discardableResult
     public func importFromText(_ text: String, name: String) throws -> EQProfile {
         let profile = try APOParser.parse(text: text, profileName: name)
-        return appendAndActivate(profile)
+        return insertProfile(profile, soloActivate: true)
     }
 
     public func replaceProfile(id: UUID, withFileURL url: URL) throws {
@@ -79,26 +120,54 @@ public final class ProfileStore: ObservableObject {
         profiles[index] = updated
         save()
 
-        if activeProfileID == id {
-            PEQAudioEngine.shared.apply(profile: updated)
+        if activeProfileIDs.contains(id) {
+            PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
         }
     }
 
-    public func createBlankProfile(name: String = "Custom Profile") {
+    public func createBlankProfile(name: String = "Custom Slot", initialBand: EQBand? = nil) {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let bands = initialBand.map { [$0] } ?? []
         let profile = EQProfile(
-            name: cleanName.isEmpty ? "Custom Profile" : cleanName,
+            name: cleanName.isEmpty ? "Custom Slot" : cleanName,
             preampDB: 0.0,
-            bands: []
+            bands: bands
         )
-        appendAndActivate(profile)
+        insertProfile(profile, soloActivate: false)
+    }
+
+    public func toggleProfileActive(id: UUID) {
+        guard profiles.contains(where: { $0.id == id }) else { return }
+        if activeProfileIDs.contains(id) {
+            activeProfileIDs.remove(id)
+        } else {
+            activeProfileIDs.insert(id)
+            selectedProfileID = id
+        }
+        save()
+        PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
+    }
+
+    public func activateOnlyProfile(id: UUID) {
+        guard profiles.contains(where: { $0.id == id }) else { return }
+        activeProfileIDs = [id]
+        selectedProfileID = id
+        save()
+        PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
+    }
+
+    public func selectProfileForEditing(id: UUID) {
+        guard profiles.contains(where: { $0.id == id }) else { return }
+        selectedProfileID = id
+        if activeProfileIDs.isEmpty {
+            activeProfileIDs = [id]
+            PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
+        }
+        save()
     }
 
     public func selectProfile(id: UUID) {
-        guard profiles.contains(where: { $0.id == id }) else { return }
-        activeProfileID = id
-        save()
-        PEQAudioEngine.shared.apply(profile: activeProfile)
+        activateOnlyProfile(id: id)
     }
 
     public func renameProfile(id: UUID, newName: String) {
@@ -109,26 +178,32 @@ public final class ProfileStore: ObservableObject {
         }
         profiles[index].name = trimmed
         save()
-        if activeProfileID == id {
-            PEQAudioEngine.shared.apply(profile: profiles[index])
+        if activeProfileIDs.contains(id) {
+            PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
         }
     }
 
     public func deleteProfile(id: UUID) {
         guard let index = profiles.firstIndex(where: { $0.id == id }) else { return }
         profiles.remove(at: index)
+        activeProfileIDs.remove(id)
 
-        if activeProfileID == id {
-            if profiles.isEmpty {
-                activeProfileID = nil
+        if selectedProfileID == id {
+            if let firstActive = activeProfiles.first {
+                selectedProfileID = firstActive.id
+            } else if !profiles.isEmpty {
+                selectedProfileID = profiles[min(index, profiles.count - 1)].id
             } else {
-                let nextIndex = min(index, profiles.count - 1)
-                activeProfileID = profiles[nextIndex].id
+                selectedProfileID = nil
             }
         }
 
+        if activeProfileIDs.isEmpty, let fallbackID = selectedProfileID {
+            activeProfileIDs.insert(fallbackID)
+        }
+
         save()
-        PEQAudioEngine.shared.apply(profile: activeProfile)
+        PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
     }
 
     public func setPreamp(for id: UUID, db: Float) {
@@ -136,14 +211,47 @@ public final class ProfileStore: ObservableObject {
         let stepped = (EQProfile.clampPreamp(db) * 10.0).rounded() / 10.0
         profiles[index].preampDB = stepped
         save()
-        if activeProfileID == id {
-            PEQAudioEngine.shared.apply(profile: profiles[index])
+        if activeProfileIDs.contains(id) {
+            PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
         }
     }
 
     public func stepPreamp(for id: UUID, by delta: Float) {
         guard let profile = profiles.first(where: { $0.id == id }) else { return }
         setPreamp(for: id, db: profile.preampDB + delta)
+    }
+
+    public func addBand(to profileID: UUID, band: EQBand) {
+        guard let profileIndex = profiles.firstIndex(where: { $0.id == profileID }) else { return }
+        profiles[profileIndex].bands.append(band)
+        save()
+        if activeProfileIDs.contains(profileID) {
+            PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
+        }
+    }
+
+    public func updateBand(in profileID: UUID, band: EQBand) {
+        guard let profileIndex = profiles.firstIndex(where: { $0.id == profileID }),
+              let bandIndex = profiles[profileIndex].bands.firstIndex(where: { $0.id == band.id }) else {
+            return
+        }
+        profiles[profileIndex].bands[bandIndex] = band
+        save()
+        if activeProfileIDs.contains(profileID) {
+            PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
+        }
+    }
+
+    public func deleteBand(in profileID: UUID, bandID: UUID) {
+        guard let profileIndex = profiles.firstIndex(where: { $0.id == profileID }),
+              let bandIndex = profiles[profileIndex].bands.firstIndex(where: { $0.id == bandID }) else {
+            return
+        }
+        profiles[profileIndex].bands.remove(at: bandIndex)
+        save()
+        if activeProfileIDs.contains(profileID) {
+            PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
+        }
     }
 
     public func toggleBand(profileID: UUID, bandID: UUID) {
@@ -153,26 +261,32 @@ public final class ProfileStore: ObservableObject {
         }
         profiles[profileIndex].bands[bandIndex].isEnabled.toggle()
         save()
-        if activeProfileID == profileID {
-            PEQAudioEngine.shared.apply(profile: profiles[profileIndex])
+        if activeProfileIDs.contains(profileID) {
+            PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
         }
     }
 
     // MARK: - Persistence
 
     @discardableResult
-    private func appendAndActivate(_ profile: EQProfile) -> EQProfile {
+    private func insertProfile(_ profile: EQProfile, soloActivate: Bool) -> EQProfile {
         profiles.insert(profile, at: 0)
-        activeProfileID = profile.id
+        if soloActivate {
+            activeProfileIDs = [profile.id]
+        } else {
+            activeProfileIDs.insert(profile.id)
+        }
+        selectedProfileID = profile.id
         save()
-        PEQAudioEngine.shared.apply(profile: profile)
+        PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
         return profile
     }
 
     private func load() {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             profiles = []
-            activeProfileID = nil
+            activeProfileIDs = []
+            selectedProfileID = nil
             return
         }
 
@@ -182,23 +296,41 @@ public final class ProfileStore: ObservableObject {
             decoder.dateDecodingStrategy = .iso8601
             let decoded = try decoder.decode(PersistedStore.self, from: data)
             profiles = decoded.profiles
-            if let savedID = decoded.activeProfileID,
-               profiles.contains(where: { $0.id == savedID }) {
-                activeProfileID = savedID
+            let validIDs = Set(profiles.map(\.id))
+
+            if let savedIDs = decoded.activeProfileIDs {
+                activeProfileIDs = Set(savedIDs.filter { validIDs.contains($0) })
+            } else if let legacyID = decoded.activeProfileID, validIDs.contains(legacyID) {
+                activeProfileIDs = [legacyID]
+            } else if let firstID = profiles.first?.id {
+                activeProfileIDs = [firstID]
             } else {
-                activeProfileID = profiles.first?.id
+                activeProfileIDs = []
+            }
+
+            if let savedSelected = decoded.selectedProfileID, validIDs.contains(savedSelected) {
+                selectedProfileID = savedSelected
+            } else {
+                selectedProfileID = activeProfiles.first?.id ?? profiles.first?.id
             }
         } catch {
             logger.error("Failed to load profiles: \(error.localizedDescription, privacy: .public)")
             lastErrorMessage = error.localizedDescription
             profiles = []
-            activeProfileID = nil
+            activeProfileIDs = []
+            selectedProfileID = nil
         }
     }
 
     private func save() {
         do {
-            let payload = PersistedStore(profiles: profiles, activeProfileID: activeProfileID)
+            let orderedActive = profiles.map(\.id).filter { activeProfileIDs.contains($0) }
+            let payload = PersistedStore(
+                profiles: profiles,
+                activeProfileID: orderedActive.first,
+                activeProfileIDs: orderedActive,
+                selectedProfileID: selectedProfileID
+            )
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             encoder.dateEncodingStrategy = .iso8601
