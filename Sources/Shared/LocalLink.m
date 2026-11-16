@@ -25,7 +25,7 @@ static os_log_t ETLinkLog(void) {
   static os_log_t l;
   static dispatch_once_t once;
   dispatch_once(&once, ^{
-    l = os_log_create("com.mypeq.app", "link");
+    l = os_log_create("cz.lubos.mypeq", "link");
   });
   return l;
 }
@@ -157,7 +157,7 @@ static __unsafe_unretained ETLinkSender *gLinkSender;
   if ((self = [super init])) {
     _fd = -1;
     _q =
-        dispatch_queue_create("com.mypeq.app.link.send", DISPATCH_QUEUE_SERIAL);
+        dispatch_queue_create("cz.lubos.mypeq.link.send", DISPATCH_QUEUE_SERIAL);
     _ring = calloc(ET_LINK_SEND_RING_SAMPLES, sizeof(float));
     // malloc 由来なので先頭は 16 バイト境界。ヘッダ 12 の直後の float 配列も 4
     // で揃う。
@@ -179,7 +179,7 @@ static __unsafe_unretained ETLinkSender *gLinkSender;
 /// 起こし役のスレッド。音のスレッドの signal を待って _q を起こすだけ。
 /// 送り手はプロセスに 1 つで解放されないので、arg は ARC の外で受ける。
 static void *ETLinkKickThread(void *arg) {
-  pthread_setname_np("com.mypeq.app.link.kick");
+  pthread_setname_np("cz.lubos.mypeq.link.kick");
   __unsafe_unretained ETLinkSender *s = (__bridge ETLinkSender *)arg;
   semaphore_t sem = s->_kickSem;
   // _kick は解放しない（init の決まり）ので、ARC の外で持って足りる。
@@ -599,7 +599,7 @@ void ETLinkSenderPushInterleaved(const float *samples, uint32_t frames,
     _listenFd = -1;
     _peerFd = -1;
     _q =
-        dispatch_queue_create("com.mypeq.app.link.recv", DISPATCH_QUEUE_SERIAL);
+        dispatch_queue_create("cz.lubos.mypeq.link.recv", DISPATCH_QUEUE_SERIAL);
     _ring = calloc(ET_LINK_RECV_RING_SAMPLES, sizeof(float));
     _rxBuf = calloc(1, ET_LINK_RX_BUF_BYTES);
     atomic_store_explicit(&_sampleRateHz, 48000u, memory_order_relaxed);

@@ -28,7 +28,7 @@ public final class ProfileStore: ObservableObject {
         }
     }
 
-    private static let autoSwitchDefaultsKey = "com.mypeq.autoSwitchEnabled"
+    private static let autoSwitchDefaultsKey = "cz.lubos.mypeq.autoSwitchEnabled"
     private var lastAutoRoutedDeviceName: String?
     private var isInitialized = false
 
@@ -78,7 +78,7 @@ public final class ProfileStore: ObservableObject {
         var selectedProfileID: UUID?
     }
 
-    private let logger = Logger(subsystem: "com.mypeq.app", category: "profile-store")
+    private let logger = Logger(subsystem: "cz.lubos.mypeq", category: "profile-store")
     private let fileURL: URL
 
     private init() {

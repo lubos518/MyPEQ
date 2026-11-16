@@ -4,11 +4,11 @@
 <dict>
 	<key>com.apple.developer.media-device-extension</key>
 	<array>
-		<string>media-device-protocol.com.mypeq.app</string>
+		<string>media-device-protocol.cz.lubos.mypeq</string>
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.mypeq.app</string>
+		<string>group.cz.lubos.mypeq</string>
 	</array>
 </dict>
 </plist>

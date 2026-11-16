@@ -1,7 +1,7 @@
 name: MyPEQ
 
 options:
-  bundleIdPrefix: com.mypeq
+  bundleIdPrefix: cz.lubos
   deploymentTarget:
     iOS: "27.0"
   createIntermediateGroups: true
@@ -32,7 +32,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: MyPEQ
-        PRODUCT_BUNDLE_IDENTIFIER: com.mypeq.app
+        PRODUCT_BUNDLE_IDENTIFIER: cz.lubos.mypeq
         INFOPLIST_FILE: Sources/MyPEQ/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Sources/MyPEQ/MyPEQ.entitlements
@@ -65,7 +65,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: MyPEQExtension
-        PRODUCT_BUNDLE_IDENTIFIER: com.mypeq.app.extension
+        PRODUCT_BUNDLE_IDENTIFIER: cz.lubos.mypeq.extension
         INFOPLIST_FILE: Sources/Extension/Info.plist
         CODE_SIGN_ENTITLEMENTS: Sources/Extension/Extension.entitlements
         SWIFT_OBJC_BRIDGING_HEADER: Sources/Extension/Extension-Bridging-Header.h

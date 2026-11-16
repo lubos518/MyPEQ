@@ -125,8 +125,8 @@ public final class PEQAudioEngine: ObservableObject {
 
     public let advertisedServiceName: String
 
-    private static let masterEnabledDefaultsKey = "com.mypeq.masterEnabled"
-    private let logger = Logger(subsystem: "com.mypeq.app", category: "audio-engine")
+    private static let masterEnabledDefaultsKey = "cz.lubos.mypeq.masterEnabled"
+    private let logger = Logger(subsystem: "cz.lubos.mypeq", category: "audio-engine")
 
     private var engine = AVAudioEngine()
     private var eqNode = AVAudioUnitEQ(numberOfBands: APOParser.maxHardwareBands)

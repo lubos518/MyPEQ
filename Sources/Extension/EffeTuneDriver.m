@@ -481,7 +481,7 @@ static OSStatus ET_GetPropertyData(AudioServerPlugInDriverRef d, AudioObjectID o
                     PUT(CFStringRef, gDeviceUID ? (CFStringRef)CFRetain(gDeviceUID)
                                                 : (CFStringRef)CFRetain(CFSTR("")));
                 case kAudioDevicePropertyModelUID:
-                    PUT(CFStringRef, (CFStringRef)CFRetain(CFSTR("com.mypeq.app.model")));
+                    PUT(CFStringRef, (CFStringRef)CFRetain(CFSTR("cz.lubos.mypeq.model")));
                 // ヘッダの要求: RemoteStreaming か RemoteScreen でないと登録が失敗する。
                 case kAudioDevicePropertyTransportType:
                     PUT(UInt32, kAudioDeviceTransportTypeRemoteStreaming);
@@ -796,7 +796,7 @@ static OSStatus ET_EndIOOperation(AudioServerPlugInDriverRef d, AudioObjectID de
     static EffeTuneDriver *s;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        gLog = os_log_create("com.mypeq.app", "driver");
+        gLog = os_log_create("cz.lubos.mypeq", "driver");
         s = [[EffeTuneDriver alloc] init];
     });
     return s;

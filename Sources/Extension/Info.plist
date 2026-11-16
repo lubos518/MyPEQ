@@ -29,7 +29,7 @@
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>media-device-protocol.com.mypeq.app</string>
+			<string>media-device-protocol.cz.lubos.mypeq</string>
 			<!-- **コントロールセンターの一覧の 2 行目はこの字。**実機で確認した。
 			     iOS はこの字を MDE のプロトコル名として扱い、エラーにもそのまま出す
 			     （「"Music" does not support playing media with "…"」。#12）。

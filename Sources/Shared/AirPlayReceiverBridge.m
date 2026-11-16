@@ -12,7 +12,7 @@ static os_log_t MyPEQBridgeLog(void) {
     static os_log_t logger;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        logger = os_log_create("com.mypeq.app", "receiver-bridge");
+        logger = os_log_create("cz.lubos.mypeq", "receiver-bridge");
     });
     return logger;
 }
