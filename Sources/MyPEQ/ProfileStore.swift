@@ -14,6 +14,24 @@ public final class ProfileStore: ObservableObject {
     @Published public private(set) var selectedProfileID: UUID?
     @Published public var lastErrorMessage: String?
 
+    @Published public var isAutoSwitchEnabled: Bool = true {
+        didSet {
+            guard isInitialized else { return }
+            UserDefaults.standard.set(isAutoSwitchEnabled, forKey: Self.autoSwitchDefaultsKey)
+            if isAutoSwitchEnabled {
+                lastAutoRoutedDeviceName = nil
+                handleOutputRouteChanged(
+                    routeName: PEQAudioEngine.shared.outputRouteName,
+                    isHeadphoneRoute: PEQAudioEngine.shared.isHeadphoneConnected
+                )
+            }
+        }
+    }
+
+    private static let autoSwitchDefaultsKey = "com.mypeq.autoSwitchEnabled"
+    private var lastAutoRoutedDeviceName: String?
+    private var isInitialized = false
+
     /// The profile currently inspected in the Preamp & Filter Editor cards.
     public var selectedProfile: EQProfile? {
         if let selectedProfileID,
@@ -67,7 +85,11 @@ public final class ProfileStore: ObservableObject {
         let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         self.fileURL = docsDir.appendingPathComponent("MyPEQProfiles.json", isDirectory: false)
+        if UserDefaults.standard.object(forKey: Self.autoSwitchDefaultsKey) != nil {
+            self.isAutoSwitchEnabled = UserDefaults.standard.bool(forKey: Self.autoSwitchDefaultsKey)
+        }
         load()
+        isInitialized = true
     }
 
     public func isProfileActive(_ id: UUID) -> Bool {
@@ -115,7 +137,8 @@ public final class ProfileStore: ObservableObject {
             name: profiles[index].name,
             preampDB: parsed.preampDB,
             bands: parsed.bands,
-            importedAt: Date()
+            importedAt: Date(),
+            autoSwitchKeyword: profiles[index].autoSwitchKeyword
         )
         profiles[index] = updated
         save()
@@ -264,6 +287,125 @@ public final class ProfileStore: ObservableObject {
         if activeProfileIDs.contains(profileID) {
             PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
         }
+    }
+
+    // MARK: - Automatic Headphone Detection & Switching
+
+    public func setAutoSwitchKeyword(for id: UUID, keyword: String?) {
+        guard let index = profiles.firstIndex(where: { $0.id == id }) else { return }
+        let cleaned = keyword?.trimmingCharacters(in: .whitespacesAndNewlines)
+        profiles[index].autoSwitchKeyword = (cleaned?.isEmpty == false) ? cleaned : nil
+        save()
+        if isAutoSwitchEnabled {
+            lastAutoRoutedDeviceName = nil
+            handleOutputRouteChanged(
+                routeName: PEQAudioEngine.shared.outputRouteName,
+                isHeadphoneRoute: PEQAudioEngine.shared.isHeadphoneConnected
+            )
+        }
+    }
+
+    public func effectiveAutoMatchLabel(for profile: EQProfile) -> String? {
+        if let explicit = profile.autoSwitchKeyword?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !explicit.isEmpty {
+            return explicit
+        }
+
+        let lower = profile.name.lowercased()
+        if lower.contains("xm5") {
+            return "XM5"
+        }
+        if lower.contains("xm4") {
+            return "XM4"
+        }
+        if lower.contains("airpods pro") || containsWordToken("ap3", in: lower) || containsWordToken("ap2", in: lower) {
+            return "AirPods Pro"
+        }
+        if lower.contains("airpods max") {
+            return "AirPods Max"
+        }
+        return nil
+    }
+
+    public func handleOutputRouteChanged(routeName: String, isHeadphoneRoute: Bool) {
+        guard isAutoSwitchEnabled else { return }
+
+        let trimmedRoute = routeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedRoute.isEmpty, trimmedRoute != "No Output" else { return }
+
+        let normalizedRoute = trimmedRoute.lowercased()
+        if normalizedRoute.contains("mypeq") || normalizedRoute.contains("effectdeck") {
+            return
+        }
+
+        guard lastAutoRoutedDeviceName != trimmedRoute else { return }
+        lastAutoRoutedDeviceName = trimmedRoute
+
+        let matchedProfiles = profiles.filter {
+            matchesRoute(profile: $0, normalizedRoute: normalizedRoute, isHeadphoneRoute: isHeadphoneRoute)
+        }
+        guard !matchedProfiles.isEmpty else { return }
+
+        let matchedIDs = Set(matchedProfiles.map(\.id))
+
+        // Replace any previously active headphone-specific profile for a different headset,
+        // while keeping unlinked add-on/custom slots (e.g. Bass Boost) stacked as-is.
+        var updatedActive = activeProfileIDs.filter { activeID in
+            if matchedIDs.contains(activeID) {
+                return true
+            }
+            guard let activeProfile = profiles.first(where: { $0.id == activeID }) else {
+                return false
+            }
+            return effectiveAutoMatchLabel(for: activeProfile) == nil
+        }
+        updatedActive.formUnion(matchedIDs)
+
+        let didChange = updatedActive != activeProfileIDs || selectedProfileID != matchedProfiles[0].id
+        activeProfileIDs = updatedActive
+        selectedProfileID = matchedProfiles[0].id
+
+        if didChange {
+            save()
+            PEQAudioEngine.shared.apply(profile: combinedActiveProfile)
+        }
+    }
+
+    private func matchesRoute(profile: EQProfile, normalizedRoute: String, isHeadphoneRoute: Bool) -> Bool {
+        if let rawKeyword = profile.autoSwitchKeyword?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !rawKeyword.isEmpty {
+            let keywords = rawKeyword
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+                .filter { !$0.isEmpty }
+            return keywords.contains { normalizedRoute.contains($0) }
+        }
+
+        let lowerName = profile.name.lowercased()
+        if normalizedRoute.contains("xm5") {
+            return lowerName.contains("xm5")
+        }
+        if normalizedRoute.contains("xm4") {
+            return lowerName.contains("xm4")
+        }
+        if normalizedRoute.contains("airpods pro") {
+            return lowerName.contains("airpods pro")
+                || containsWordToken("ap3", in: lowerName)
+                || containsWordToken("ap2", in: lowerName)
+        }
+        if normalizedRoute.contains("airpods max") {
+            return lowerName.contains("airpods max")
+        }
+
+        if isHeadphoneRoute, normalizedRoute.count >= 4 {
+            return lowerName.contains(normalizedRoute)
+        }
+        return false
+    }
+
+    private func containsWordToken(_ token: String, in text: String) -> Bool {
+        let parts = text.split { !$0.isLetter && !$0.isNumber }
+        return parts.contains { $0 == token }
     }
 
     // MARK: - Persistence

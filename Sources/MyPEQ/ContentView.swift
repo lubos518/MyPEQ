@@ -29,6 +29,9 @@ public struct ContentView: View {
     @State private var renamingProfile: EQProfile?
     @State private var renameDraft: String = ""
 
+    @State private var keywordEditingProfile: EQProfile?
+    @State private var keywordDraft: String = ""
+
     @State private var deletingProfile: EQProfile?
     @State private var filterEditorTarget: FilterEditorTarget?
     @State private var errorAlertMessage: String?
@@ -134,6 +137,29 @@ public struct ContentView: View {
             }
         } message: { profile in
             Text("Enter a display name for \"\(profile.name)\".")
+        }
+        .alert(
+            "Auto-Switch Device Keyword",
+            isPresented: Binding(
+                get: { keywordEditingProfile != nil },
+                set: { if !$0 { keywordEditingProfile = nil } }
+            ),
+            presenting: keywordEditingProfile
+        ) { profile in
+            TextField("e.g. XM5 or AirPods Pro", text: $keywordDraft)
+            Button("Save") {
+                profileStore.setAutoSwitchKeyword(for: profile.id, keyword: keywordDraft)
+                keywordEditingProfile = nil
+            }
+            Button("Clear Rule", role: .destructive) {
+                profileStore.setAutoSwitchKeyword(for: profile.id, keyword: nil)
+                keywordEditingProfile = nil
+            }
+            Button("Cancel", role: .cancel) {
+                keywordEditingProfile = nil
+            }
+        } message: { profile in
+            Text("Comma-separated Bluetooth/headphone name matches for \"\(profile.name)\".")
         }
         .confirmationDialog(
             "Delete Profile?",
@@ -293,17 +319,26 @@ public struct ContentView: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
-                if profileStore.activeProfiles.count > 1 {
-                    Text("\(profileStore.activeProfiles.count) Active")
+                Button {
+                    profileStore.isAutoSwitchEnabled.toggle()
+                } label: {
+                    Label("Auto", systemImage: "headphones")
                         .font(.caption2.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(profileStore.isAutoSwitchEnabled ? Color.accentColor : Color.secondary)
                         .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(
+                                profileStore.isAutoSwitchEnabled
+                                    ? Color.accentColor.opacity(0.15)
+                                    : Color.primary.opacity(0.07)
+                            )
+                        )
                 }
+                .buttonStyle(.plain)
+                .fixedSize(horizontal: true, vertical: false)
+                .accessibilityLabel("Auto-switch profile by headphones")
+                .accessibilityValue(profileStore.isAutoSwitchEnabled ? "On" : "Off")
 
                 Spacer(minLength: 4)
 
@@ -434,6 +469,13 @@ public struct ContentView: View {
 
                 Spacer(minLength: 4)
 
+                if isEditing {
+                    Text("Editing")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
                 Menu {
                     slotMenuActions(for: profile)
                 } label: {
@@ -479,10 +521,11 @@ public struct ContentView: View {
 
                         Spacer(minLength: 2)
 
-                        if isEditing {
-                            Text("Editing")
-                                .font(.caption2.weight(.semibold))
+                        if let matchLabel = profileStore.effectiveAutoMatchLabel(for: profile) {
+                            Label(matchLabel, systemImage: "headphones")
+                                .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
                     }
                 }
@@ -512,6 +555,33 @@ public struct ContentView: View {
             presentNewFilterSheet(for: profile)
         } label: {
             Label("Add Filter", systemImage: "plus.circle")
+        }
+
+        Divider()
+
+        if !audioEngine.isLoopbackDetected,
+           !audioEngine.outputRouteName.isEmpty,
+           audioEngine.outputRouteName != "No Output" {
+            Button {
+                profileStore.setAutoSwitchKeyword(for: profile.id, keyword: audioEngine.outputRouteName)
+            } label: {
+                Label("Link to \"\(audioEngine.outputRouteName)\"", systemImage: "headphones")
+            }
+        }
+
+        Button {
+            keywordDraft = profile.autoSwitchKeyword ?? profileStore.effectiveAutoMatchLabel(for: profile) ?? ""
+            keywordEditingProfile = profile
+        } label: {
+            Label("Set Auto-Switch Keyword…", systemImage: "tag")
+        }
+
+        if profile.autoSwitchKeyword != nil {
+            Button {
+                profileStore.setAutoSwitchKeyword(for: profile.id, keyword: nil)
+            } label: {
+                Label("Clear Auto-Switch Link", systemImage: "tag.slash")
+            }
         }
 
         Divider()

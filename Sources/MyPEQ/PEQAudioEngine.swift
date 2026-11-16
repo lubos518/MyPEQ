@@ -403,6 +403,7 @@ public final class PEQAudioEngine: ObservableObject {
         let nameStem = String(cString: MyPEQReceiverGetServiceName())
         let loopback = outputs.contains {
             $0.portName.localizedCaseInsensitiveContains(nameStem)
+                || $0.portName.localizedCaseInsensitiveContains("EffectDeck")
         }
         let onSpeaker = outputs.contains {
             $0.portType == .builtInSpeaker
@@ -432,9 +433,17 @@ public final class PEQAudioEngine: ObservableObject {
             .usbAudio
         ]
 
+        let headphones = outputs.contains { headphonePorts.contains($0.portType) }
         outputRouteName = primary.portName
-        isHeadphoneConnected = outputs.contains { headphonePorts.contains($0.portType) }
+        isHeadphoneConnected = headphones
         isLoopbackDetected = loopback
+
+        if !loopback {
+            ProfileStore.shared.handleOutputRouteChanged(
+                routeName: primary.portName,
+                isHeadphoneRoute: headphones
+            )
+        }
     }
 
     private func startStatusTimer() {

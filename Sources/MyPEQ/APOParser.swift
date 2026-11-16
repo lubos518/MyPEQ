@@ -82,19 +82,22 @@ public struct EQProfile: Identifiable, Codable, Hashable, Sendable {
     public var preampDB: Float
     public var bands: [EQBand]
     public let importedAt: Date
+    public var autoSwitchKeyword: String?
 
     public init(
         id: UUID = UUID(),
         name: String,
         preampDB: Float = 0.0,
         bands: [EQBand] = [],
-        importedAt: Date = Date()
+        importedAt: Date = Date(),
+        autoSwitchKeyword: String? = nil
     ) {
         self.id = id
         self.name = name
         self.preampDB = Self.clampPreamp(preampDB)
         self.bands = bands
         self.importedAt = importedAt
+        self.autoSwitchKeyword = autoSwitchKeyword
     }
 
     public static func clampPreamp(_ db: Float) -> Float {
