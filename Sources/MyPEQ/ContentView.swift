@@ -18,7 +18,6 @@ public struct ContentView: View {
     @ObservedObject private var profileStore = ProfileStore.shared
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
 
     @State private var isFileImporterPresented = false
     @State private var pendingReplaceProfileID: UUID?
@@ -207,18 +206,12 @@ public struct ContentView: View {
 
     private var floatingHeaderBar: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(statusBadgeColor.opacity(colorScheme == .dark ? 0.24 : 0.14))
-                        .frame(width: 36, height: 36)
-
-                    Image(systemName: audioEngine.isStreamingAudio ? "waveform" : "hifispeaker.fill")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(statusBadgeColor)
-                        .symbolEffect(.variableColor.iterative, isActive: audioEngine.isStreamingAudio && !reduceMotion)
-                }
-                .accessibilityHidden(true)
+            HStack(spacing: 12) {
+                Image(systemName: audioEngine.isStreamingAudio ? "waveform" : "hifispeaker.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(statusBadgeColor)
+                    .frame(width: 28, height: 28)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -234,7 +227,7 @@ public struct ContentView: View {
                             .fixedSize(horizontal: true, vertical: false)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
-                            .background(Capsule().fill(statusBadgeColor.opacity(0.15)))
+                            .background(Capsule().fill(Color(.tertiarySystemFill)))
                     }
 
                     Text(routeSummaryText)
@@ -245,22 +238,15 @@ public struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 4) {
-                    AirPlayRoutePickerButton()
-                        .frame(width: 40, height: 40)
-                        .contentShape(Rectangle())
-
-                    Toggle(isOn: $audioEngine.isMasterEnabled) {
-                        Text("Master EQ")
-                    }
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .tint(.accentColor)
-                    .frame(minHeight: 40)
-                    .accessibilityLabel("Master Equalizer")
-                    .accessibilityValue(audioEngine.isMasterEnabled ? "Enabled" : "Bypassed")
+                Toggle(isOn: $audioEngine.isMasterEnabled) {
+                    Text("Master EQ")
                 }
-                .fixedSize(horizontal: true, vertical: false)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(.accentColor)
+                .frame(minHeight: 40)
+                .accessibilityLabel("Master Equalizer")
+                .accessibilityValue(audioEngine.isMasterEnabled ? "Enabled" : "Bypassed")
             }
 
             if audioEngine.isLoopbackDetected {
@@ -274,7 +260,7 @@ public struct ContentView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .floatingLiquidGlassBar(cornerRadius: 24)
+        .floatingLiquidGlassBar(cornerRadius: 20)
     }
 
     private var statusHeadline: String {
@@ -432,8 +418,8 @@ public struct ContentView: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.tertiarySystemGroupedBackground))
         )
     }
 

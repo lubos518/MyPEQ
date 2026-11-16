@@ -1,5 +1,5 @@
 //  PEQAudioEngine.swift
-//  Bit-transparent Float32 audio engine hosting the local MyPEQ AirPlay receiver,
+//  Bit-transparent Float32 audio engine hosting the ETLinkReceiver loopback socket,
 //  exact EqualizerAPO Q-to-bandwidth 20-band AVAudioUnitEQ, and A2DP/wired routing.
 
 import AVFoundation
@@ -114,6 +114,7 @@ public final class PEQAudioEngine: ObservableObject {
     @Published public private(set) var isHeadphoneConnected: Bool = false
     @Published public private(set) var isLoopbackDetected: Bool = false
     @Published public private(set) var bufferedFrames: UInt32 = 0
+    @Published public private(set) var receivedFrames: UInt64 = 0
     @Published public private(set) var lastErrorMessage: String?
 
     @Published public var isMasterEnabled: Bool = true {
@@ -125,6 +126,7 @@ public final class PEQAudioEngine: ObservableObject {
 
     public let advertisedServiceName: String
 
+    private static let linkFixedSampleRate: Double = 48000.0
     private static let masterEnabledDefaultsKey = "cz.lubos.mypeq.masterEnabled"
     private let logger = Logger(subsystem: "cz.lubos.mypeq", category: "audio-engine")
 
@@ -137,6 +139,9 @@ public final class PEQAudioEngine: ObservableObject {
     private var isSpeakerOverrideActive = false
     private var routeEscapeAttempts = 0
     private var lastRouteEscapeTime: TimeInterval = 0
+    private var lastStartAttempt: TimeInterval = 0
+    private var isInterrupted = false
+    private var lastObservedReceivedFrames: UInt64 = 0
 
     private var statusTimer: Timer?
     private var notificationTokens: [NSObjectProtocol] = []
@@ -146,33 +151,40 @@ public final class PEQAudioEngine: ObservableObject {
         if UserDefaults.standard.object(forKey: Self.masterEnabledDefaultsKey) != nil {
             self.isMasterEnabled = UserDefaults.standard.bool(forKey: Self.masterEnabledDefaultsKey)
         }
+        // Keep 127.0.0.1:47101 open immediately so MediaDeviceExtension can connect at any time.
+        self.isReceiverListening = MyPEQReceiverStart()
         installSessionObservers()
     }
 
     public func start() {
-        guard !isEngineRunning else {
+        if isEngineRunning && engine.isRunning {
             refreshStatusSnapshot()
             return
         }
 
+        lastStartAttempt = ProcessInfo.processInfo.systemUptime
         lastErrorMessage = nil
+
+        if !MyPEQReceiverIsRunning() {
+            isReceiverListening = MyPEQReceiverStart()
+        } else {
+            isReceiverListening = true
+        }
+
         configureAudioSession()
 
-        let receiverStarted = MyPEQReceiverStart()
-        isReceiverListening = receiverStarted
+        let sessionRate = AVAudioSession.sharedInstance().sampleRate
+        sampleRate = sessionRate > 0 ? sessionRate : Self.linkFixedSampleRate
+        MyPEQReceiverSetSampleRate(Self.linkFixedSampleRate)
 
-        let resolvedRate = resolveSampleRate()
-        sampleRate = resolvedRate
-        MyPEQReceiverSetSampleRate(resolvedRate)
-
-        rebuildAndStartGraph(sampleRate: resolvedRate)
+        rebuildAndStartGraph()
         applyCurrentParameters()
         startStatusTimer()
         refreshRouteState()
         refreshStatusSnapshot()
     }
 
-    public func stop() {
+    public func stop(keepListening: Bool = false) {
         statusTimer?.invalidate()
         statusTimer = nil
 
@@ -189,10 +201,13 @@ public final class PEQAudioEngine: ObservableObject {
             engine.detach(sourceNode)
             self.sourceNode = nil
         }
+        try? AVAudioSession.sharedInstance().setActive(false)
 
-        MyPEQReceiverStop()
+        if !keepListening {
+            MyPEQReceiverStop()
+            isReceiverListening = false
+        }
         isEngineRunning = false
-        isReceiverListening = false
         isStreamingAudio = false
         bufferedFrames = 0
     }
@@ -211,52 +226,58 @@ public final class PEQAudioEngine: ObservableObject {
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
+            // Matching EffectDeck's session configuration: .playAndRecord avoids
+            // MediaExperience assigning LongFormAudio routing policy (which pulls the app
+            // onto its own virtual route) while keeping A2DP Bluetooth headphones active
+            // and allowing overrideOutputAudioPort(.speaker) as an escape hatch.
             try session.setCategory(
-                .playback,
+                .playAndRecord,
                 mode: .default,
-                options: [.allowBluetoothA2DP, .mixWithOthers]
+                options: [.defaultToSpeaker, .mixWithOthers, .allowBluetoothA2DP]
             )
-            try? session.setPreferredSampleRate(MyPEQReceiverGetSampleRate())
+            try? session.setPreferredSampleRate(Self.linkFixedSampleRate)
             try session.setActive(true)
+            pinInputToBuiltInMic(session)
         } catch {
             logger.error("AVAudioSession configuration failed: \(error.localizedDescription, privacy: .public)")
             lastErrorMessage = error.localizedDescription
         }
     }
 
-    private func resolveSampleRate() -> Double {
-        let sessionRate = AVAudioSession.sharedInstance().sampleRate
-        if abs(sessionRate - 44100.0) < 5.0 {
-            return 44100.0
+    /// Pinning input to the built-in mic prevents iOS from dropping Bluetooth A2DP stereo
+    /// down into mono HFP call profile when .playAndRecord is active.
+    private func pinInputToBuiltInMic(_ session: AVAudioSession, route: AVAudioSessionRouteDescription? = nil) {
+        if let route, route.inputs.contains(where: { $0.portType == .builtInMic }) {
+            return
         }
-        if abs(sessionRate - 48000.0) < 5.0 {
-            return 48000.0
+        guard let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else {
+            return
         }
-        let receiverRate = MyPEQReceiverGetSampleRate()
-        return abs(receiverRate - 44100.0) < 5.0 ? 44100.0 : 48000.0
+        try? session.setPreferredInput(builtInMic)
     }
 
-    private func rebuildAndStartGraph(sampleRate: Double) {
+    private func rebuildAndStartGraph() {
         engine.stop()
         engine.reset()
         engine = AVAudioEngine()
         eqNode = AVAudioUnitEQ(numberOfBands: APOParser.maxHardwareBands)
 
-        // 32-bit Float32 non-interleaved stereo preserves full dynamic range (including Dolby Atmos).
-        // Zero compressor, limiter, AGC, or loudness normalization is inserted anywhere in this graph.
-        guard let renderFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2) else {
-            lastErrorMessage = "Failed to initialize Float32 stereo format at \(Int(sampleRate)) Hz."
+        // ETLinkReceiver delivers 48 kHz 32-bit Float32 stereo frames from MyPEQExtension.
+        // Keeping the DSP graph fixed at 48 kHz lets mainMixerNode->outputNode handle any
+        // hardware rate seamlessly without tearing down the engine on route transitions.
+        guard let linkFormat = AVAudioFormat(standardFormatWithSampleRate: Self.linkFixedSampleRate, channels: 2) else {
+            lastErrorMessage = "Failed to initialize 48 kHz Float32 stereo format."
             return
         }
 
-        let source = makeLoopbackSourceNode(format: renderFormat, context: renderContext)
+        let source = makeLoopbackSourceNode(format: linkFormat, context: renderContext)
         sourceNode = source
 
         engine.attach(source)
         engine.attach(eqNode)
 
-        engine.connect(source, to: eqNode, format: renderFormat)
-        engine.connect(eqNode, to: engine.mainMixerNode, format: renderFormat)
+        engine.connect(source, to: eqNode, format: linkFormat)
+        engine.connect(eqNode, to: engine.mainMixerNode, format: linkFormat)
         engine.mainMixerNode.outputVolume = 1.0
         engine.prepare()
 
@@ -302,7 +323,6 @@ public final class PEQAudioEngine: ObservableObject {
             }
 
             bandParam.frequency = EQBand.clampFrequency(band.frequency)
-            // AVAudioUnitEQ supports gains up to +24 dB safely on iOS hardware/DSP nodes.
             bandParam.gain = min(max(band.gain, -30.0), 24.0)
             bandParam.bandwidth = APOParser.bandwidthInOctaves(fromQ: band.q)
             bandParam.bypass = !band.isEnabled
@@ -341,12 +361,25 @@ public final class PEQAudioEngine: ObservableObject {
 
         notificationTokens.append(
             center.addObserver(
+                forName: .AVAudioEngineConfigurationChange,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleEngineConfigurationChange()
+                }
+            }
+        )
+
+        notificationTokens.append(
+            center.addObserver(
                 forName: AVAudioSession.mediaServicesWereResetNotification,
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
-                    self?.stop()
+                    self?.isInterrupted = false
+                    self?.stop(keepListening: true)
                     self?.start()
                 }
             }
@@ -356,16 +389,23 @@ public final class PEQAudioEngine: ObservableObject {
     private func handleRouteChange() {
         refreshRouteState()
 
-        let currentRate = resolveSampleRate()
-        if abs(currentRate - sampleRate) > 1.0, isEngineRunning {
-            sampleRate = currentRate
-            MyPEQReceiverSetSampleRate(currentRate)
-            rebuildAndStartGraph(sampleRate: currentRate)
-            applyCurrentParameters()
-        } else if !engine.isRunning, isReceiverListening {
-            configureAudioSession()
-            rebuildAndStartGraph(sampleRate: sampleRate)
-            applyCurrentParameters()
+        if !engine.isRunning && !isInterrupted {
+            let now = ProcessInfo.processInfo.systemUptime
+            if now - lastStartAttempt >= 1.0 {
+                stop(keepListening: true)
+                start()
+            }
+        }
+    }
+
+    private func handleEngineConfigurationChange() {
+        refreshRouteState()
+
+        guard !engine.isRunning, !isInterrupted else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        if now - lastStartAttempt >= 1.0 {
+            stop(keepListening: true)
+            start()
         }
     }
 
@@ -377,11 +417,13 @@ public final class PEQAudioEngine: ObservableObject {
 
         switch type {
         case .began:
+            isInterrupted = true
             isEngineRunning = false
         case .ended:
+            isInterrupted = false
             configureAudioSession()
             if !engine.isRunning {
-                rebuildAndStartGraph(sampleRate: sampleRate)
+                rebuildAndStartGraph()
                 applyCurrentParameters()
             }
         @unknown default:
@@ -391,7 +433,15 @@ public final class PEQAudioEngine: ObservableObject {
 
     private func refreshRouteState() {
         let session = AVAudioSession.sharedInstance()
-        let outputs = session.currentRoute.outputs
+        let cur = session.currentRoute
+        pinInputToBuiltInMic(session, route: cur)
+
+        let hardwareRate = session.sampleRate
+        if hardwareRate > 0, abs(sampleRate - hardwareRate) > 1.0 {
+            sampleRate = hardwareRate
+        }
+
+        let outputs = cur.outputs
         guard let primary = outputs.first else {
             outputRouteName = "No Output"
             isHeadphoneConnected = false
@@ -456,9 +506,8 @@ public final class PEQAudioEngine: ObservableObject {
     }
 
     private func refreshStatusSnapshot() {
-        let running = engine.isRunning
-        if isEngineRunning != running {
-            isEngineRunning = running
+        if !MyPEQReceiverIsRunning() {
+            _ = MyPEQReceiverStart()
         }
 
         let listening = MyPEQReceiverIsRunning()
@@ -466,14 +515,35 @@ public final class PEQAudioEngine: ObservableObject {
             isReceiverListening = listening
         }
 
-        let streaming = MyPEQReceiverIsStreaming() && !isLoopbackDetected
-        if isStreamingAudio != streaming {
-            isStreamingAudio = streaming
+        if !engine.isRunning && !isInterrupted {
+            let now = ProcessInfo.processInfo.systemUptime
+            if now - lastStartAttempt >= 1.0 {
+                stop(keepListening: true)
+                start()
+                return
+            }
+        }
+
+        let running = engine.isRunning
+        if isEngineRunning != running {
+            isEngineRunning = running
         }
 
         let frames = MyPEQReceiverGetBufferedFrames()
         if bufferedFrames != frames {
             bufferedFrames = frames
+        }
+
+        let totalRecv = MyPEQReceiverGetReceivedFrames()
+        let advancing = totalRecv > lastObservedReceivedFrames
+        lastObservedReceivedFrames = totalRecv
+        if receivedFrames != totalRecv {
+            receivedFrames = totalRecv
+        }
+
+        let streaming = (MyPEQReceiverIsStreaming() || frames > 0 || advancing) && !isLoopbackDetected
+        if isStreamingAudio != streaming {
+            isStreamingAudio = streaming
         }
     }
 }

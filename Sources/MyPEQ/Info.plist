@@ -40,10 +40,11 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>MyPEQ uses a local loopback connection between its MediaDevice extension and audio engine to apply parametric EQ in real time.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MyPEQ uses playAndRecord audio routing so processed audio plays cleanly to Bluetooth or wired headphones while receiving system audio. It never records or stores microphone audio.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
-		<string>voip</string>
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>

@@ -53,7 +53,7 @@ public struct FrequencyResponseGraph: View {
             .accessibilityLabel(accessibilitySummary)
         }
         .padding(16)
-        .liquidGlassCard(cornerRadius: 24)
+        .liquidGlassCard(cornerRadius: 20)
     }
 
     private var headerRow: some View {
@@ -75,7 +75,7 @@ public struct FrequencyResponseGraph: View {
                                 .foregroundStyle(Color.accentColor)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
-                                .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                                .background(Capsule().fill(Color(.tertiarySystemFill)))
                         }
 
                         Text(String(format: "Preamp %+.1f dB", profile.preampDB))
@@ -84,7 +84,7 @@ public struct FrequencyResponseGraph: View {
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(Capsule().fill(.ultraThinMaterial))
+                            .background(Capsule().fill(Color(.tertiarySystemFill)))
                     }
                     .lineLimit(1)
                 } else {
@@ -216,23 +216,13 @@ public struct FrequencyResponseGraph: View {
             fillPath.addLine(to: CGPoint(x: first.x, y: baselineY))
             fillPath.closeSubpath()
 
-            context.fill(
-                fillPath,
-                with: .linearGradient(
-                    Gradient(colors: [
-                        Color.accentColor.opacity(colorScheme == .dark ? 0.30 : 0.22),
-                        Color.accentColor.opacity(0.03)
-                    ]),
-                    startPoint: CGPoint(x: plotRect.midX, y: plotRect.minY),
-                    endPoint: CGPoint(x: plotRect.midX, y: plotRect.maxY)
-                )
-            )
+            context.fill(fillPath, with: .color(Color.accentColor.opacity(0.06)))
         }
 
         let strokeColor = isMasterEnabled ? Color.accentColor : Color.secondary.opacity(0.6)
         let strokeStyle = isMasterEnabled
-            ? StrokeStyle(lineWidth: 2.25, lineCap: .round, lineJoin: .round)
-            : StrokeStyle(lineWidth: 1.75, lineCap: .round, dash: [4, 4])
+            ? StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round)
+            : StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [4, 4])
         context.stroke(curvePath, with: .color(strokeColor), style: strokeStyle)
     }
 
