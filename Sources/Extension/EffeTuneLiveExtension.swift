@@ -27,7 +27,7 @@ import os
 //   1. entitlement com.apple.developer.media-device-extension の値
 //   2. Info.plist の UTExportedTypeDeclarations / UTTypeIdentifier
 //   3. protocolType
-let kProtocolID = "media-device-protocol.cz.lubos.mypeq"
+let kProtocolID = "media-device-protocol.com.mypeq.app"
 
 let log = Logger(subsystem: "cz.lubos.mypeq", category: "extension")
 

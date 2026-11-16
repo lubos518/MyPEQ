@@ -1,0 +1,28 @@
+{
+	"path": "/",
+	"root": "C:\\Users\\lubos\\.gemini\\antigravity\\brain\\5ef4077b-7003-4252-a27d-ac5618a90585\\scratch\\zsign_test\\unpacked\\Payload\\MyPEQ.app",
+	"bundle_id": "com.mypeq.app",
+	"bundle_version": "1",
+	"bundle_executable": "MyPEQ",
+	"sha1": "+S/D0QnjZS3x+7DH+aGuSl7WGtM=",
+	"sha256": "aBuznA/r6CARZcmzmS57su2laZdfUJpV0Iqwewc8YGY=",
+	"name": "MyPEQ",
+	"folders": [
+		{
+			"bundle_id": "com.mypeq.app.extension",
+			"bundle_version": "1",
+			"bundle_executable": "MyPEQExtension",
+			"sha1": "lGECtslTfBzhfU39TrzL9edIFSE=",
+			"sha256": "thkKvFNpxSRD9QfP3TQvmFCO2fGBQhic5xJdvH2HQ7w=",
+			"path": "Extensions\\MyPEQExtension.appex"
+		}
+	],
+	"files": [ "Extensions\\MyPEQExtension.appex\\MyPEQExtension", "MyPEQ" ],
+	"changed": [
+		"Extensions\\MyPEQExtension.appex\\MyPEQExtension",
+		"MyPEQ",
+		"Extensions\\MyPEQExtension.appex/_CodeSignature/CodeResources",
+		"Extensions\\MyPEQExtension.appex/MyPEQExtension",
+		"embedded.mobileprovision"
+	]
+}
